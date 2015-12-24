@@ -7,6 +7,11 @@ from socket import gethostbyaddr
 from functools import partial
 from exceptions import *
 
+from pyroute2 import IPRoute
+import pyping
+from netaddr import *
+
+
 conf.verb = sr_verbose
 
 
@@ -149,11 +154,64 @@ class Network:
                 self._gateway = self.get_device(ip=ip)
         return self._gateway
 
+
+    def  findHosts(self,network):
+            """
+            The FindHostFunction is responsible for finding all hosts in a network
+            and returning a host list in string format
+            @variable network: The network
+            @return   hostList: A list of all hosts in the network
+            """
+            #Defingin the network
+            ipNet = IPNetwork(network)
+     
+            #Creating a list of hosts
+            hosts = list(ipNet)
+     
+            #Removing the net and broad address if prefix is under 31 bits
+            if len(hosts) > 2:
+                hosts.remove(ipNet.broadcast)
+                hosts.remove(ipNet.network)
+     
+            #Creating a list of hosts in string format.
+            hostList = [str(host) for host in hosts]
+     
+            return hostList
+    def ping_hostslist(self,hosts):
+        localhostsup=[]
+        for ip in hosts:
+            r = pyping.ping(ip)
+            if r.ret_code == 0:
+                localhostsup.append(ip)
+
+        return localhostsup
+
+
+    def get_localaddr(self):
+        ip = IPRoute()
+        infos = [{'iface': x['index'],
+             'addr': x.get_attr('IFA_ADDRESS'),
+             'mask': x['prefixlen']} for x in ip.get_addr()]
+        ip.close()
+        return infos
+
+    def devices(self):
+        hostsup=[]
+        infos = self.get_localaddr()
+        for info in infos:
+            # escape from localhost and ipv6 
+            if info['addr']!="127.0.0.1" and "::" not in info['addr']:
+                hosts = self.FindHosts("%s/%s"%(info['addr'],info['mask']))
+                
+                hostsup.append([info,self.ping_hostslist(hosts)])
+
+        return hostsup
+
+
     """
     TODO: Return all devices in network
     """
-    def devices(self):
-        pass
+    
 
 
 class Device:
