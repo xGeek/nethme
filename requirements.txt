@@ -1,2 +1,4 @@
 scapy
-netaddr 
+netaddr
+pyping
+pyroute2
